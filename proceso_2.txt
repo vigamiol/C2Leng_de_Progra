@@ -1,0 +1,8 @@
+Proceso2
+1 I
+2 ES 3
+3 I
+4 I
+5 ES 4
+6 I
+7 F
