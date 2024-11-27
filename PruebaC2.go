@@ -201,10 +201,6 @@ func main() {
 
 	time.Sleep(26 * time.Second)
 
-	for datos := range d.ColaListos {
-		fmt.Println(datos.Nombre)
-	}
-
 	file, err := os.Create("salida.txt")
 	if err != nil {
 		fmt.Println("Error al crear el archivo:", err)
