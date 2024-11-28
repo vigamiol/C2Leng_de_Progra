@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -12,7 +11,7 @@ import (
 type BCP struct {
 	Nombre string //nombre del proceso
 	PID    int    //numero de proceso
-	Estado string //estado del proceso (Listo, Bloqueado, Terminado, ejecutado)
+	Estado string //estado del proceso (Listo, Bloqueado, Terminado, ejecutando)
 	CP     int    // numero de instruccion del proceso
 
 }
@@ -20,14 +19,19 @@ type BCP struct {
 type Dispatcher struct {
 	ColaListos     chan *BCP
 	ColaBloqueados chan *BCP
-	procesador     bool
 	contador       int //contador global de instrucciones
+	colaproce      bool
 }
 
-type Instruccion struct {
-	Numero    int    // Número de la instrucción
-	Tipo      string // Tipo de instrucción: "I", "ES", "F"
-	Parametro int    // Parámetro adicional (por ejemplo, tiempo de bloqueo en "ES")
+type Instruciones struct {
+	Linea     int    // Número de línea
+	Tipo      string // Tipo de instrucción (I, E/S, F)
+	Parametro int    // Parámetro adicional en caso de ser E/S
+}
+
+type Procesador struct {
+	Proceso    chan *BCP
+	Procesador bool
 }
 
 var procesos = make(map[int][]string)
@@ -66,67 +70,7 @@ func LeerProcesosDesdeArchivo(nombreArchivo string) (map[int][]string, error) {
 
 	return procesos, nil
 }
-func leerArchivoProceso(rutaArchivo string) (*BCP, error) {
-	archivo, err := os.Open(rutaArchivo)
-	if err != nil {
-		return nil, fmt.Errorf("error al abrir el archivo: %v", err)
-	}
-	defer archivo.Close()
 
-	scanner := bufio.NewScanner(archivo)
-	var instrucciones []Instruccion
-
-	for scanner.Scan() {
-		linea := strings.TrimSpace(scanner.Text())
-
-		// Ignorar comentarios y líneas vacías
-		if strings.HasPrefix(linea, "#") || linea == "" {
-			continue
-		}
-
-		// Dividir la línea en dos partes: número de instrucción y tipo (con posible parámetro)
-		partes := strings.Fields(linea)
-		if len(partes) < 2 {
-			return nil, fmt.Errorf("línea mal formada: %s", linea)
-		}
-
-		// Convertir el número de instrucción a entero
-		numero, err := strconv.Atoi(partes[0])
-		if err != nil {
-			return nil, fmt.Errorf("error al convertir número de instrucción: %v", err)
-		}
-
-		// Determinar el tipo de instrucción y el parámetro (si aplica)
-		tipo := partes[1]
-		parametro := 0
-		if tipo == "ES" && len(partes) == 3 {
-			parametro, err = strconv.Atoi(partes[2])
-			if err != nil {
-				return nil, fmt.Errorf("error al convertir parámetro de ES: %v", err)
-			}
-		}
-
-		// Agregar la instrucción a la lista
-		instrucciones = append(instrucciones, Instruccion{
-			Numero:    numero,
-			Tipo:      tipo,
-			Parametro: parametro,
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error al leer el archivo: %v", err)
-	}
-
-	// Crear el BCP para este proceso
-	proceso := &BCP{
-		PID:    0,       // Asignar el PID más adelante
-		Estado: "Listo", // Inicia en estado "Listo"
-		CP:     0,       // Contador de Programa inicia en 0
-	}
-
-	return proceso, nil
-}
 func ObtenerValorSiExiste(mapa map[int][]string, clave int) ([]string, bool) {
 	valor, existe := mapa[clave]
 	return valor, existe
@@ -142,9 +86,10 @@ func (d *Dispatcher) CrearProcesos(tiempoProcesos map[int][]string) {
 			nuevoProceso := &BCP{
 				Nombre: nombreArchivo,
 				Estado: "Listo", // Estado inicial del proceso
-				PID:    0,       // Se puede asignar un PID único si es necesario
+				PID:    pid,     //Asignacion de PID
 				CP:     0,       // Contador de programa inicial
 			}
+			pid++
 			// Enviar el proceso a la cola de listos
 			select {
 			case d.ColaListos <- nuevoProceso:
@@ -168,12 +113,69 @@ func (d *Dispatcher) PasarTiempo() {
 			return
 		}
 		// duerme medio segundo entre cada iteración
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 		d.contador++
 	}
 
 }
 
+func (d *Dispatcher) transferirProcesos(entrada chan *BCP, salida chan *BCP, p *Procesador) {
+	for proceso := range entrada { // Iterar sobre los procesos de entrada
+		if !p.Procesador { // Verificar si el procesador está libre
+			fmt.Println("Transferiendo proceso al procesador")
+			p.Procesador = true // Marcar el procesador como ocupado
+			salida <- proceso   // Enviar el proceso al canal de salida
+		} else {
+			// El procesador está ocupado, esperar hasta que se libere
+			fmt.Println("Procesador ocupado, esperando...")
+
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+}
+
+func (p *Procesador) EjecutarProcesos(entrada chan *BCP, salida chan *BCP) {
+	// Bucle para procesar los elementos del canal
+	for proceso := range p.Proceso { // Recibir el primer proceso del canal
+		// Mostrar el proceso que se está ejecutando
+		fmt.Printf("Ejecutando proceso con archivo: %s\n", proceso.Nombre)
+
+		// Leer el archivo asociado al proceso
+		file, err := os.Open(proceso.Nombre)
+		if err != nil {
+			fmt.Printf("Error al abrir el archivo %s: %v\n", proceso.Nombre, err)
+			continue
+		}
+
+		// Leer y mostrar las líneas del archivo
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			fmt.Println(scanner.Text()) // Imprimir cada línea del archivo
+		}
+
+		if err := scanner.Err(); err != nil {
+			fmt.Printf("Error al leer el archivo %s: %v\n", proceso.Nombre, err)
+		}
+		file.Close()
+
+		proceso.Estado = "bloqueado" // Cambiar el estado del proceso
+
+		for proceso := range entrada {
+			salida <- proceso
+			p.Procesador = true
+		}
+
+	}
+
+}
+
+func (d *Dispatcher) bloquearProceso(entrada chan *BCP, salida chan *BCP, p *Procesador) {
+
+	for proceso := range entrada {
+		fmt.Println("nombre:", proceso.Nombre)
+	}
+}
 func main() {
 	// Nombre del archivo de entrada
 	nombreArchivo := "orden_creacion.txt"
@@ -194,10 +196,16 @@ func main() {
 		ColaListos:     make(chan *BCP, 10), // Canal con capacidad para 10 procesos
 		ColaBloqueados: make(chan *BCP, 10), //Canal con capacidad para 10 procesos
 		contador:       0,                   // Inicializamos el contador a 0
-		procesador:     false,               // Iniciamos el contador en falso(nno hay proceso en el procesador)
+		colaproce:      false,
+	}
+	p := Procesador{
+		Proceso:    make(chan *BCP, 1),
+		Procesador: false,
 	}
 
 	go d.PasarTiempo()
+	go d.transferirProcesos(d.ColaListos, p.Proceso, &p)
+	go p.EjecutarProcesos(p.Proceso, d.ColaBloqueados)
 
 	time.Sleep(26 * time.Second)
 
