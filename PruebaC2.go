@@ -122,9 +122,10 @@ func (d *Dispatcher) PasarTiempo() {
 func (d *Dispatcher) transferirProcesos(entrada chan *BCP, salida chan *BCP, p *Procesador) {
 	for proceso := range entrada { // Iterar sobre los procesos de entrada
 		if !p.Procesador { // Verificar si el procesador está libre
-			fmt.Println("Transferiendo proceso al procesador")
+			fmt.Println("PULL  Dispatcher ", d.contador)
 			p.Procesador = true // Marcar el procesador como ocupado
-			salida <- proceso   // Enviar el proceso al canal de salida
+			fmt.Printf("LOAD %s  %d \n", proceso.Nombre, d.contador)
+			salida <- proceso // Enviar el proceso al canal de salida
 		} else {
 			// El procesador está ocupado, esperar hasta que se libere
 			fmt.Println("Procesador ocupado, esperando...")
@@ -135,11 +136,11 @@ func (d *Dispatcher) transferirProcesos(entrada chan *BCP, salida chan *BCP, p *
 
 }
 
-func (p *Procesador) EjecutarProcesos(entrada chan *BCP, salida chan *BCP) {
+func (p *Procesador) EjecutarProcesos(salida chan *BCP, d *Dispatcher) {
 	// Bucle para procesar los elementos del canal
 	for proceso := range p.Proceso { // Recibir el primer proceso del canal
 		// Mostrar el proceso que se está ejecutando
-		fmt.Printf("Ejecutando proceso con archivo: %s\n", proceso.Nombre)
+		fmt.Printf("EXEC : %s Dispatcher %d \n", proceso.Nombre, d.contador)
 
 		// Leer el archivo asociado al proceso
 		file, err := os.Open(proceso.Nombre)
@@ -159,23 +160,14 @@ func (p *Procesador) EjecutarProcesos(entrada chan *BCP, salida chan *BCP) {
 		}
 		file.Close()
 
-		proceso.Estado = "bloqueado" // Cambiar el estado del proceso
-
-		for proceso := range entrada {
-			salida <- proceso
-			p.Procesador = true
-		}
-
+		proceso.Estado = "bloqueado"
+		//solo cuando el proceso no termina
+		salida <- proceso
+		p.Procesador = false
 	}
 
 }
 
-func (d *Dispatcher) bloquearProceso(entrada chan *BCP, salida chan *BCP, p *Procesador) {
-
-	for proceso := range entrada {
-		fmt.Println("nombre:", proceso.Nombre)
-	}
-}
 func main() {
 	// Nombre del archivo de entrada
 	nombreArchivo := "orden_creacion.txt"
@@ -205,7 +197,7 @@ func main() {
 
 	go d.PasarTiempo()
 	go d.transferirProcesos(d.ColaListos, p.Proceso, &p)
-	go p.EjecutarProcesos(p.Proceso, d.ColaBloqueados)
+	go p.EjecutarProcesos(d.ColaBloqueados, &d)
 
 	time.Sleep(26 * time.Second)
 
