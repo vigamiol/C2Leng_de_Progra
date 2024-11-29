@@ -111,8 +111,8 @@ func (d *Dispatcher) PasarTiempo() {
 
 		d.CrearProcesos(procesos)
 		// Verificar si el contador ha llegado a 50 y salir del bucle
-		if d.contador > 49 {
-			fmt.Println("Contador alcanzó 50, terminando...")
+		if d.contador > 99 {
+			fmt.Println("Contador alcanzó 100, terminando...")
 			return
 		}
 		// duerme medio segundo entre cada iteración
@@ -136,12 +136,12 @@ func (d *Dispatcher) transferirProcesos(entrada chan *BCP, salida chan *BCP, p *
 			fmt.Println("Procesador ocupado, esperando...")
 
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 }
 
-func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, entrada chan *BCP, aleatoria int) {
+func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, entrada chan *BCP) {
 
 	// Bucle para procesar los elementos del canal
 	for proceso := range p.Proceso { // Recibir el primer proceso del canal
@@ -185,16 +185,6 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 				}
 				//guardar instruccion(I,ES,F)
 				instruccion := partes[1]
-
-				if contadorO == maxInstrucciones {
-					proceso.ultimalinealeida = linea
-					fmt.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
-					p.ejecuciones++
-					entrada <- proceso // Enviar a la cola de bloqueados
-					p.Procesador = false
-					break
-
-				}
 				if instruccion == "ES" {
 					//convertir campo[2] en entero
 					listo, er := strconv.Atoi(partes[2])
@@ -211,10 +201,27 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 					p.Procesador = false
 					break
 				}
-				ActualizarContadores(salida, entrada)
+				if instruccion == "F" {
+					proceso.Estado = "terminado"
+					fmt.Printf("Proceso terminado ")
+					p.Procesador = false
+					break
+				}
+				if contadorO == maxInstrucciones {
+					proceso.ultimalinealeida = linea
+					fmt.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
+					p.ejecuciones++
+					entrada <- proceso
+					p.Procesador = false
+					break
+
+				}
+
+				time.Sleep(1 * time.Second)
 
 			}
 			lineaActual++
+			ActualizarContadores(salida, entrada)
 		}
 
 		if err := scanner.Err(); err != nil {
@@ -264,7 +271,6 @@ func main() {
 	salida := "salida.txt"
 	n := 1
 	o = 2
-	aleatoria := 5
 
 	// Llamar a la función para leer los procesos
 	procesos, err := LeerProcesosDesdeArchivo(nombreArchivo)
@@ -292,9 +298,9 @@ func main() {
 
 	go d.PasarTiempo()
 	go d.transferirProcesos(d.ColaListos, p.Proceso, &p)
-	go p.EjecutarProcesos(d.ColaBloqueados, o, d.ColaListos, aleatoria)
+	go p.EjecutarProcesos(d.ColaBloqueados, o, d.ColaListos)
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(100 * time.Second)
 
 	file, err := os.Create(salida)
 	if err != nil {
