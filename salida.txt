@@ -1,0 +1,127 @@
+PULL  Dispatcher  0
+LOAD proceso_1.txt  1 
+EXEC : proceso_1.txt Dispatcher 2 
+1 I 3 
+2 I 4 
+ST proceso_1.txt Dispatcher 5 
+PULL  Dispatcher  6
+LOAD proceso_2.txt  7 
+EXEC : proceso_2.txt Dispatcher 8 
+1 I 9 
+2 ES 3 10 
+ST proceso_2.txt Dispatcher 11 
+PULL  Dispatcher  12
+LOAD proceso_1.txt  13 
+EXEC : proceso_1.txt Dispatcher 14 
+EVENTO E/S proceso_2.txt movido a cola listo
+3 ES 5 15 
+ST proceso_1.txt Dispatcher 16 
+PULL  Dispatcher  17
+LOAD proceso_2.txt  18 
+EXEC : proceso_2.txt Dispatcher 19 
+3 I 20 
+4 I 21 
+ST proceso_2.txt Dispatcher 22 
+PULL  Dispatcher  23
+LOAD proceso_2.txt  24 
+EXEC : proceso_2.txt Dispatcher 25 
+EVENTO E/S proceso_1.txt movido a cola listo
+5 ES 4 26 
+ST proceso_2.txt Dispatcher 27 
+PULL  Dispatcher  28
+LOAD proceso_1.txt  29 
+EXEC : proceso_1.txt Dispatcher 30 
+EVENTO E/S proceso_2.txt movido a cola listo
+4 I 31 
+5 I 32 
+ST proceso_1.txt Dispatcher 33 
+PULL  Dispatcher  34
+LOAD proceso_2.txt  35 
+EXEC : proceso_2.txt Dispatcher 36 
+6 I 37 
+7 F 38 
+Proceso terminado 
+PULL  Dispatcher  39
+LOAD proceso_1.txt  40 
+EXEC : proceso_1.txt Dispatcher 41 
+6 I 42 
+7 I 43 
+ST proceso_1.txt Dispatcher 44 
+PULL  Dispatcher  45
+LOAD proceso_1.txt  46 
+EXEC : proceso_1.txt Dispatcher 47 
+8 I 48 
+9 I 49 
+ST proceso_1.txt Dispatcher 50 
+PULL  Dispatcher  51
+LOAD proceso_1.txt  52 
+EXEC : proceso_1.txt Dispatcher 53 
+10 I 54 
+11 I 55 
+ST proceso_1.txt Dispatcher 56 
+PULL  Dispatcher  57
+LOAD proceso_3.txt  58 
+EXEC : proceso_3.txt Dispatcher 59 
+1 I 60 
+2 I 61 
+ST proceso_3.txt Dispatcher 62 
+PULL  Dispatcher  63
+LOAD proceso_1.txt  64 
+EXEC : proceso_1.txt Dispatcher 65 
+12 I 66 
+13 I 67 
+ST proceso_1.txt Dispatcher 68 
+PULL  Dispatcher  69
+LOAD proceso_3.txt  70 
+EXEC : proceso_3.txt Dispatcher 71 
+3 I 72 
+4 ES 6 73 
+ST proceso_3.txt Dispatcher 74 
+PULL  Dispatcher  75
+LOAD proceso_1.txt  76 
+EXEC : proceso_1.txt Dispatcher 77 
+EVENTO E/S proceso_3.txt movido a cola listo
+14 F 78 
+Proceso terminado 
+PULL  Dispatcher  79
+LOAD proceso_3.txt  80 
+EXEC : proceso_3.txt Dispatcher 81 
+5 I 82 
+6 I 83 
+ST proceso_3.txt Dispatcher 84 
+PULL  Dispatcher  85
+LOAD proceso_3.txt  86 
+EXEC : proceso_3.txt Dispatcher 87 
+7 F 88 
+Proceso terminado 
+PULL  Dispatcher  89
+LOAD proceso_4.txt  90 
+EXEC : proceso_4.txt Dispatcher 91 
+1 I 92 
+2 ES 4 93 
+ST proceso_4.txt Dispatcher 94 
+PULL  Dispatcher  95
+LOAD proceso_5.txt  96 
+EXEC : proceso_5.txt Dispatcher 97 
+1 I 98 
+2 I 99 
+ST proceso_5.txt Dispatcher 100 
+PULL  Dispatcher  101
+LOAD proceso_5.txt  102 
+EXEC : proceso_5.txt Dispatcher 103 
+EVENTO E/S proceso_4.txt movido a cola listo
+3 ES 3 104 
+ST proceso_5.txt Dispatcher 105 
+PULL  Dispatcher  106
+LOAD proceso_4.txt  107 
+EXEC : proceso_4.txt Dispatcher 108 
+EVENTO E/S proceso_5.txt movido a cola listo
+3 I 109 
+4 I 110 
+ST proceso_4.txt Dispatcher 111 
+PULL  Dispatcher  112
+LOAD proceso_5.txt  113 
+EXEC : proceso_5.txt Dispatcher 114 
+4 I 115 
+5 I 116 
+ST proceso_5.txt Dispatcher 117 

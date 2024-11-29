@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -40,6 +41,7 @@ var procesos = make(map[int][]string)
 var pid int = 1
 var o int
 var contadorO int = 0
+var salidaArchivo *os.File
 
 func LeerProcesosDesdeArchivo(nombreArchivo string) (map[int][]string, error) {
 	// Abrir archivo
@@ -112,7 +114,7 @@ func (d *Dispatcher) PasarTiempo() {
 		d.CrearProcesos(procesos)
 		// Verificar si el contador ha llegado a 50 y salir del bucle
 		if d.contador > 99 {
-			fmt.Println("Contador alcanzó 100, terminando...")
+			log.Println("Contador alcanzó 100, terminando...")
 			return
 		}
 		// duerme medio segundo entre cada iteración
@@ -125,15 +127,15 @@ func (d *Dispatcher) PasarTiempo() {
 func (d *Dispatcher) transferirProcesos(entrada chan *BCP, salida chan *BCP, p *Procesador) {
 	for proceso := range entrada { // Iterar sobre los procesos de entrada
 		if !p.Procesador { // Verificar si el procesador está libre
-			fmt.Println("PULL  Dispatcher ", p.ejecuciones)
+			log.Println("PULL  Dispatcher ", p.ejecuciones)
 			p.ejecuciones++
 			p.Procesador = true // Marcar el procesador como ocupado
-			fmt.Printf("LOAD %s  %d \n", proceso.Nombre, p.ejecuciones)
+			log.Printf("LOAD %s  %d \n", proceso.Nombre, p.ejecuciones)
 			p.ejecuciones++
 			salida <- proceso // Enviar el proceso al canal de salida
 		} else {
 			// El procesador está ocupado, esperar hasta que se libere
-			fmt.Println("Procesador ocupado, esperando...")
+			log.Println("Procesador ocupado, esperando...")
 
 		}
 		time.Sleep(2 * time.Second)
@@ -147,7 +149,7 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 	for proceso := range p.Proceso { // Recibir el primer proceso del canal
 		// Mostrar el proceso que se está ejecutando
 		contadorO = 0
-		fmt.Printf("EXEC : %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
+		log.Printf("EXEC : %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
 		p.ejecuciones++
 		// Leer el archivo asociado al proceso
 		archivo, err := os.Open(proceso.Nombre)
@@ -172,7 +174,7 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 				}
 
 				// Imprimir la línea que será procesada
-				fmt.Printf("%s %d \n", lineaTexto, p.ejecuciones)
+				log.Printf("%s %d \n", lineaTexto, p.ejecuciones)
 				p.ejecuciones++
 				contadorO++
 
@@ -195,7 +197,7 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 					proceso.Estado = "bloqueado"
 					proceso.tiempoListo = listo
 					proceso.ultimalinealeida = linea
-					fmt.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
+					log.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
 					p.ejecuciones++
 					salida <- proceso // Enviar a la cola de bloqueados
 					p.Procesador = false
@@ -203,13 +205,13 @@ func (p *Procesador) EjecutarProcesos(salida chan *BCP, maxInstrucciones int, en
 				}
 				if instruccion == "F" {
 					proceso.Estado = "terminado"
-					fmt.Printf("Proceso terminado ")
+					log.Printf("Proceso terminado ")
 					p.Procesador = false
 					break
 				}
 				if contadorO == maxInstrucciones {
 					proceso.ultimalinealeida = linea
-					fmt.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
+					log.Printf("ST %s Dispatcher %d \n", proceso.Nombre, p.ejecuciones)
 					p.ejecuciones++
 					entrada <- proceso
 					p.Procesador = false
@@ -255,7 +257,7 @@ Procesar:
 
 		// Si el contador llega a 0, considerar desbloquear el proceso
 		if proceso.tiempoListo == 0 {
-			fmt.Printf("EVENTO E/S %s movido a cola listo\n", proceso.Nombre)
+			log.Printf("EVENTO E/S %s movido a cola listo\n", proceso.Nombre)
 			proceso.Estado = "listo" // Cambiar el estado a listo (o lo que corresponda)
 			ColaListo <- proceso
 		} else {
@@ -266,28 +268,56 @@ Procesar:
 }
 
 func main() {
-	// Nombre del archivo de entrada
-	nombreArchivo := "orden_creacion.txt"
-	salida := "salida.txt"
-	n := 1
-	o = 2
+	// Validar argumentos de línea de comandos
+	if len(os.Args) != 6 {
+		fmt.Println("Uso: Orden_Ejecucion_Prog n o P archivo_orden_creacion_procesos nombre_archivo_salida")
+		os.Exit(1)
+	}
 
-	// Llamar a la función para leer los procesos
-	procesos, err := LeerProcesosDesdeArchivo(nombreArchivo)
+	// Parsear argumentos
+	n, err := strconv.Atoi(os.Args[1])
+	if err != nil || n != 1 {
+		fmt.Println("Error: n debe ser 1 (un núcleo)")
+		os.Exit(1)
+	}
+
+	o, err := strconv.Atoi(os.Args[2])
 	if err != nil {
-		fmt.Printf("Error al leer el archivo: %v\n", err)
-		return
+		fmt.Println("Error: o debe ser un número entero")
+		os.Exit(1)
 	}
 
-	// Imprimir el mapa de procesos
-	for tiempo, nombres := range procesos {
-		fmt.Printf("Tiempo: %d -> Procesos: %v\n", tiempo, nombres)
+	archivoOrden := os.Args[4]
+	archivoSalida := os.Args[5]
+
+	// Abrir archivo de salida
+	salidaArchivo, err = os.Create(archivoSalida)
+	if err != nil {
+		fmt.Println("Error al crear archivo de salida:", err)
+		os.Exit(1)
+	}
+	defer salidaArchivo.Close()
+
+	// Redirigir la salida a un archivo
+	writer := bufio.NewWriter(salidaArchivo)
+	defer writer.Flush()
+
+	// Redirigir fmt.Printf a archivo usando log
+	log.SetFlags(0)
+	log.SetOutput(writer)
+
+	// Leer procesos desde el archivo de orden
+	procesos, err = LeerProcesosDesdeArchivo(archivoOrden)
+	if err != nil {
+		fmt.Println("Error al leer archivo de procesos:", err)
+		os.Exit(1)
 	}
 
+	// Inicializar dispatcher y procesador
 	d := Dispatcher{
-		ColaListos:     make(chan *BCP, 10), // Canal con capacidad para 10 procesos
-		ColaBloqueados: make(chan *BCP, 10), //Canal con capacidad para 10 procesos
-		contador:       0,                   // Inicializamos el contador a 0
+		ColaListos:     make(chan *BCP, 10),
+		ColaBloqueados: make(chan *BCP, 10),
+		contador:       0,
 	}
 
 	p := Procesador{
@@ -296,36 +326,12 @@ func main() {
 		ejecuciones: 0,
 	}
 
+	// Iniciar gorrutinas
 	go d.PasarTiempo()
 	go d.transferirProcesos(d.ColaListos, p.Proceso, &p)
 	go p.EjecutarProcesos(d.ColaBloqueados, o, d.ColaListos)
 
-	time.Sleep(100 * time.Second)
-
-	file, err := os.Create(salida)
-	if err != nil {
-		fmt.Println("Error al crear el archivo:", err)
-		return
-	}
-	defer file.Close()
-
-	// Crear un escritor bufio
-	writer := bufio.NewWriter(file)
-
-	// Escribir varias líneas
-	for i := 1; i <= 5; i++ {
-		_, err := writer.WriteString(fmt.Sprintf("Línea %d\n", i))
-		if err != nil {
-			fmt.Println("Error al escribir en el archivo:", err)
-			return
-		}
-	}
-
-	// Asegurarse de vaciar el búfer
-	err = writer.Flush()
-	if err != nil {
-		fmt.Println("Error al vaciar el búfer:", err)
-		return
-	}
+	// Esperar un tiempo razonable para la simulación
+	time.Sleep(60 * time.Second)
 
 }
